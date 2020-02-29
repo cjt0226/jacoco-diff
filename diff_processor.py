@@ -1,3 +1,4 @@
+# coding=utf-8
 import re
 import os
 
@@ -5,10 +6,10 @@ from git import Repo
 
 
 class DiffProcessor():
-    def __init__(self, project_dir, old_version, module_name):
+    def __init__(self, project_dir, old_version, report_dir):
         self.project_dir = project_dir
         self.old_version = old_version
-        self.module_name = module_name
+        self.report_dir = report_dir
         self.repo = Repo(self.project_dir)
 
     def resolve_file_info(self, file_name):
@@ -104,6 +105,17 @@ class DiffProcessor():
 
         return new_line_count, cover_line_count
 
+    def add_statistics_index_html(self, info):
+        index_file_path = "../report/index.html"
+        with open(index_file_path, 'r') as fp:
+            content = fp.readlines()
+
+        for i in range(0, len(content)):
+            content[i] = content[i].replace("</body>", info)
+
+        with open(index_file_path, 'w') as fp:
+            fp.write("".join(content))
+
     def process_diff(self):
         ret = {}
         diff_result = self.get_diff()
@@ -118,13 +130,18 @@ class DiffProcessor():
                 continue
 
             module_name, package, class_, is_interface = self.resolve_file_info(file_name)
-            # 过滤掉接口和非指定的module
-            if is_interface or module_name != self.module_name:
+            # 过滤掉接口
+            if is_interface:
                 continue
 
-            html_file_name = os.path.join(self.project_dir, module_name, 'target/site/jacoco/', package, "{}.java.html".format(class_))
+            html_file_name = os.path.join(self.report_dir, package, "{}.java.html".format(class_))
             new_line_count, cover_line_count = self.modify_html(html_file_name, diff_result[file_name])
             print("package {}, class {}, 新增 {} 行, 覆盖 {} 行".format(package, class_, new_line_count, cover_line_count))
+            info = "package {}, class {}, 新增 {} 行, 覆盖 {} 行".format(package, class_, new_line_count, cover_line_count)
+            # info = '<p><font color="#FF0000">{}</font></p></body>'.format(info)
+            html_url = "{}/{}".format(package, "{}.java.html".format(class_))
+            info = '<a href={}><p>{}</p></body>'.format(html_url, info)
+            self.add_statistics_index_html(info)
 
             # 信息存进返回值
             if package not in ret:
@@ -132,3 +149,12 @@ class DiffProcessor():
             ret[package][class_] = {"new": new_line_count, "cover": cover_line_count}
 
         return ret
+
+
+if __name__ == '__main__':
+    project_dir = "../source"
+    old_version = "HEAD~1"
+    report_dir = "../report"
+    module_name = ""
+    processor = DiffProcessor(project_dir, old_version, report_dir)
+    diff_cov_info = processor.process_diff()
