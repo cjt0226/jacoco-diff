@@ -92,7 +92,7 @@ class DiffProcessor():
 
         for i in range(1, len(content)):
             if i + 1 in diff_lines:
-                match = re.search('class="([^"]+)"', content[i])
+                match = re.search('class="([^"]+[^-diff$])"', content[i])
                 if match:
                     content[i] = re.sub('class="([^"]+)"', lambda m: 'class="{}-diff"'.format(m.group(1)), content[i])
                     css_class = match.group(1)
